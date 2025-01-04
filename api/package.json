@@ -1,0 +1,9 @@
+{
+  "name": "kochiswebshop-api",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {},
+  "engines": {
+    "node": ">=18.x"
+  }
+}
