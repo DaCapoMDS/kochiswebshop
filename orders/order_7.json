@@ -1,0 +1,14 @@
+{
+  "id": 7,
+  "timestamp": "2025-01-04T19:33:08.907Z",
+  "status": "pending",
+  "items": [
+    {
+      "id": 1,
+      "name": "Test Product",
+      "price": 29.99,
+      "quantity": 1
+    }
+  ],
+  "total": 29.99
+}
