@@ -1,4 +1,4 @@
-import { Octokit } from '@octokit/rest';
+const { Octokit } = require('@octokit/rest');
 
 // Order validation schema
 const orderSchema = {
@@ -126,7 +126,7 @@ async function saveOrder(orderData) {
   }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -191,4 +191,4 @@ export default async function handler(req, res) {
       details: error.message
     });
   }
-}
+};
