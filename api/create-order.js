@@ -12,9 +12,8 @@ const orderSchema = {
   }
 };
 
-// Private repository for orders
 const REPO_OWNER = 'DaCapoMDS';
-const REPO_NAME = 'kochis-orders'; // Private repo for orders
+const REPO_NAME = 'kochis-orders';
 const ORDERS_BRANCH = 'main';
 
 // Validate order data against schema
@@ -40,55 +39,9 @@ function validateOrder(data) {
   return { valid: true };
 }
 
-// Check if repository exists and is accessible
-async function checkRepository(octokit) {
-  try {
-    await octokit.repos.get({
-      owner: REPO_OWNER,
-      repo: REPO_NAME
-    });
-    return true;
-  } catch (error) {
-    if (error.status === 404) {
-      return false;
-    }
-    throw error;
-  }
-}
-
-// Create repository if it doesn't exist
-async function ensureRepository(octokit) {
-  const exists = await checkRepository(octokit);
-  if (!exists) {
-    try {
-      await octokit.repos.createForAuthenticatedUser({
-        name: REPO_NAME,
-        private: true,
-        description: 'Private repository for Kochi\'s Webshop orders',
-        auto_init: true
-      });
-
-      // Initialize counter file
-      await octokit.repos.createOrUpdateFileContents({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        path: 'counter.txt',
-        message: 'Initialize order counter',
-        content: Buffer.from('0').toString('base64'),
-        branch: ORDERS_BRANCH
-      });
-    } catch (error) {
-      console.error('Error creating repository:', error);
-      throw error;
-    }
-  }
-}
-
 // Get current counter value
 async function getCurrentCounter(octokit) {
   try {
-    await ensureRepository(octokit);
-
     const { data } = await octokit.repos.getContent({
       owner: REPO_OWNER,
       repo: REPO_NAME,
@@ -125,7 +78,15 @@ async function updateCounter(octokit, currentCounter) {
       message: `Update order counter to ${newCounter}`,
       content: Buffer.from(newCounter.toString()).toString('base64'),
       sha: currentFile.sha,
-      branch: ORDERS_BRANCH
+      branch: ORDERS_BRANCH,
+      committer: {
+        name: 'Order System',
+        email: 'orders@kochiswebshop.vercel.app'
+      },
+      author: {
+        name: 'Order System',
+        email: 'orders@kochiswebshop.vercel.app'
+      }
     });
 
     return newCounter;
@@ -137,8 +98,6 @@ async function updateCounter(octokit, currentCounter) {
 
 // Save order to repository
 async function saveOrder(octokit, orderData) {
-  await ensureRepository(octokit);
-  
   const currentCounter = await getCurrentCounter(octokit);
   const orderNumber = currentCounter + 1;
   
@@ -150,39 +109,11 @@ async function saveOrder(octokit, orderData) {
   };
 
   try {
-    // Create order file in a year/month structure for better organization
-    const date = new Date();
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const orderPath = `orders/${year}/${month}/order_${orderNumber}.json`;
-
-    // Create year/month directory structure if needed
-    try {
-      await octokit.repos.getContent({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        path: `orders/${year}/${month}`,
-        ref: ORDERS_BRANCH
-      });
-    } catch (error) {
-      if (error.status === 404) {
-        // Create directory structure by creating a .gitkeep file
-        await octokit.repos.createOrUpdateFileContents({
-          owner: REPO_OWNER,
-          repo: REPO_NAME,
-          path: `orders/${year}/${month}/.gitkeep`,
-          message: `Create directory structure for ${year}/${month}`,
-          content: Buffer.from('').toString('base64'),
-          branch: ORDERS_BRANCH
-        });
-      }
-    }
-
-    // Save order file
-    await octokit.repos.createOrUpdateFileContents({
+    // Create order file
+    const createOptions = {
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      path: orderPath,
+      path: `orders/order_${orderNumber}.json`,
       message: `Create order ${orderNumber}`,
       content: Buffer.from(JSON.stringify(order, null, 2)).toString('base64'),
       branch: ORDERS_BRANCH,
@@ -194,7 +125,27 @@ async function saveOrder(octokit, orderData) {
         name: 'Order System',
         email: 'orders@kochiswebshop.vercel.app'
       }
-    });
+    };
+
+    // Try to get existing file (will fail if it doesn't exist)
+    try {
+      const { data: existingFile } = await octokit.repos.getContent({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path: createOptions.path,
+        ref: ORDERS_BRANCH
+      });
+      // If file exists, add its SHA
+      createOptions.sha = existingFile.sha;
+    } catch (error) {
+      // File doesn't exist, which is fine for new orders
+      if (error.status !== 404) {
+        throw error;
+      }
+    }
+
+    // Create/update the file
+    await octokit.repos.createOrUpdateFileContents(createOptions);
 
     // Update counter
     await updateCounter(octokit, currentCounter);
@@ -256,7 +207,7 @@ module.exports = async function handler(req, res) {
     // Use ORDERS_TOKEN environment variable for private repo access
     const { Octokit } = await import('@octokit/rest');
     const octokit = new Octokit({
-      auth: process.env.ORDERS_TOKEN // Use separate token for orders repo
+      auth: process.env.ORDERS_TOKEN
     });
 
     // Save order to repository
