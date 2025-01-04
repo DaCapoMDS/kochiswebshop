@@ -2,7 +2,6 @@
   "name": "github-issues-backend",
   "version": "1.0.0",
   "description": "Backend for Kochi's webshop order system",
-  "main": "api/create-order.js",
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
@@ -13,8 +12,8 @@
     "node": ">=14.0.0"
   },
   "scripts": {
-    "start": "node api/create-order.js",
-    "vercel-build": "echo 'Building...'"
+    "dev": "nodemon api/create-order.js",
+    "vercel-build": "echo 'Building Vercel Serverless Functions'"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

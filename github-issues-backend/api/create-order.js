@@ -1,54 +1,62 @@
 const fetch = require('node-fetch');
 
 module.exports = async (req, res) => {
+  // Log request details for debugging
+  console.log('Request Method:', req.method);
+  console.log('Request Headers:', req.headers);
+  console.log('Request URL:', req.url);
+  console.log('Vercel Environment:', process.env.VERCEL_ENV || 'development');
+  console.log('Node Environment:', process.env.NODE_ENV);
+  console.log('Available Environment Keys:', Object.keys(process.env));
+
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(204).end();
     return;
   }
 
+  // Add debug endpoint
+  if (req.url.endsWith('/debug')) {
+    return res.status(200).json({
+      message: 'Debug endpoint reached',
+      environment: {
+        VERCEL_ENV: process.env.VERCEL_ENV,
+        NODE_ENV: process.env.NODE_ENV,
+        HAS_GITHUB_TOKEN: !!process.env.GITHUB_API_TOKEN,
+        ENV_KEYS: Object.keys(process.env)
+      },
+      request: {
+        method: req.method,
+        headers: req.headers,
+        url: req.url
+      }
+    });
+  }
+
   // Verify GitHub token is configured
-  console.log('Environment variables:', process.env);
-  console.log('GitHub API Token:', process.env.GITHUB_API_TOKEN);
-  
   if (!process.env.GITHUB_API_TOKEN) {
     console.error('GitHub token not found in environment');
     return res.status(500).json({
       error: 'Server configuration error',
-      details: 'GitHub token not configured'
+      details: 'GitHub token not configured',
+      environment: process.env.VERCEL_ENV || 'development',
+      envKeys: Object.keys(process.env)
     });
-  }
-
-  // Handle HEAD requests after token verification
-  if (req.method === 'HEAD') {
-    try {
-      const response = await fetch('https://api.github.com/repos/DaCapoMDS/Webshop_PATtest', {
-        method: 'HEAD',
-        headers: {
-          'Authorization': `token ${process.env.GITHUB_API_TOKEN}`,
-          'Accept': 'application/vnd.github.v3+json',
-          'User-Agent': 'KochiWebshop'
-        }
-      });
-      
-      if (response.ok) {
-        res.status(200).end();
-      } else {
-        console.error('GitHub API check failed:', response.status);
-        res.status(response.status).end();
-      }
-    } catch (error) {
-      console.error('GitHub API check error:', error);
-      res.status(500).end();
-    }
-    return;
   }
 
   // Allow GET requests for debugging
   if (req.method === 'GET') {
     return res.status(200).json({
-      environment: process.env,
-      githubToken: process.env.GITHUB_API_TOKEN
+      status: 'API endpoint reached',
+      tokenStatus: {
+        exists: !!process.env.GITHUB_API_TOKEN,
+        scopes: process.env.GITHUB_API_TOKEN ? 'Present but redacted' : 'Not present'
+      },
+      environment: {
+        VERCEL_ENV: process.env.VERCEL_ENV,
+        NODE_ENV: process.env.NODE_ENV,
+        ENV_KEYS: Object.keys(process.env)
+      }
     });
   }
 
@@ -69,49 +77,39 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const fs = require('fs').promises;
-    const path = require('path');
-    
-    // Ensure orders directory exists
-    const ordersDir = path.join(__dirname, '../../docs/orders');
-    await fs.mkdir(ordersDir, { recursive: true });
+    // Create GitHub issue for the order
+    const response = await fetch('https://api.github.com/repos/DaCapoMDS/Webshop_PATtest/issues', {
+      method: 'POST',
+      headers: {
+        'Authorization': `token ${process.env.GITHUB_API_TOKEN}`,
+        'Accept': 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'KochiWebshop'
+      },
+      body: JSON.stringify({
+        title: `Order #${new Date().getTime()}`,
+        body: JSON.stringify(orderData, null, 2),
+        labels: ['order']
+      })
+    });
 
-    // Read current counter
-    const counterPath = path.join(ordersDir, 'counter.txt');
-    let currentCounter = 0;
-    
-    try {
-      const counterContent = await fs.readFile(counterPath, 'utf-8');
-      currentCounter = parseInt(counterContent) || 0;
-    } catch (error) {
-      if (error.code !== 'ENOENT') throw error;
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('GitHub API Error:', errorData);
+      return res.status(response.status).json({
+        error: 'GitHub API error',
+        details: errorData
+      });
     }
 
-    const newCounter = currentCounter + 1;
-
-    // Prepare the order with number
-    const order = {
-      ...orderData,
-      orderNumber: newCounter,
-      createdAt: new Date().toISOString()
-    };
-
-    // Create the order file
-    const orderContent = JSON.stringify(order, null, 2);
-    const orderPath = path.join(ordersDir, `order_${newCounter}.json`);
-    await fs.writeFile(orderPath, orderContent);
-
-    // Update the counter
-    await fs.writeFile(counterPath, newCounter.toString());
-
-    // Return success response
+    const issue = await response.json();
 
     return res.status(201).json({
       message: 'Order created successfully',
       order: {
-        id: order.id,
-        orderNumber: newCounter,
-        status: order.status
+        id: issue.number,
+        url: issue.html_url,
+        status: 'created'
       }
     });
 
