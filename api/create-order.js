@@ -1,9 +1,14 @@
 // Order validation schema
 const orderSchema = {
-  required: ['total', 'items'],
+  required: ['order'],
   properties: {
-    total: { type: 'number', minimum: 0 },
-    items: { type: 'array', minItems: 1 }
+    order: {
+      required: ['items', 'total'],
+      properties: {
+        items: { type: 'array', minItems: 1 },
+        total: { type: 'number', minimum: 0 }
+      }
+    }
   }
 };
 
@@ -17,21 +22,18 @@ function validateOrder(data) {
     return { valid: false, error: 'Order data must be an object' };
   }
 
-  // Check required fields
-  for (const field of orderSchema.required) {
-    if (!(field in data)) {
-      return { valid: false, error: `Missing required field: ${field}` };
-    }
+  // Check for order object
+  if (!data.order || typeof data.order !== 'object') {
+    return { valid: false, error: 'Missing order details' };
   }
 
-  // Validate total
-  if (typeof data.total !== 'number' || data.total < 0) {
-    return { valid: false, error: 'Invalid total amount' };
-  }
-
-  // Validate items
-  if (!Array.isArray(data.items) || data.items.length === 0) {
+  // Check required fields in order
+  if (!Array.isArray(data.order.items) || data.order.items.length === 0) {
     return { valid: false, error: 'Order must contain at least one item' };
+  }
+
+  if (typeof data.order.total !== 'number' || data.order.total < 0) {
+    return { valid: false, error: 'Invalid total amount' };
   }
 
   return { valid: true };
