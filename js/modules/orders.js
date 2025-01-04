@@ -12,7 +12,7 @@ export class OrderManager {
 
     async checkOrderSystemConnection() {
         try {
-            console.log('Checking order system connection...');
+            console.log('Checking Vercel API connection...');
             
             const response = await fetch(API_ENDPOINTS.ORDERS_API, {
                 method: 'GET',
@@ -21,24 +21,44 @@ export class OrderManager {
                 }
             });
 
+            const data = await response.json();
+
             if (!response.ok) {
-                console.error('Order system check failed:', response.status);
+                console.error('Vercel API check failed:', response.status);
                 return {
                     success: false,
-                    message: ERROR_MESSAGES.SYSTEM_UNAVAILABLE
+                    message: ERROR_MESSAGES.SYSTEM_UNAVAILABLE,
+                    details: data.error || 'Unknown error'
                 };
             }
 
-            console.log('Order system check successful');
+            // Verify we got the expected response format
+            if (!data.status || !data.environment || !data.timestamp) {
+                console.error('Invalid API response format:', data);
+                return {
+                    success: false,
+                    message: ERROR_MESSAGES.SYSTEM_ERROR,
+                    details: 'Invalid API response format'
+                };
+            }
+
+            console.log('Vercel API check successful:', {
+                environment: data.environment,
+                timestamp: data.timestamp
+            });
+
             return {
                 success: true,
-                message: 'Order system is ready'
+                message: data.message,
+                environment: data.environment,
+                timestamp: data.timestamp
             };
         } catch (error) {
-            console.error('Error checking order system connection:', error);
+            console.error('Error checking Vercel API connection:', error);
             return {
                 success: false,
-                message: ERROR_MESSAGES.CONNECTION_ERROR
+                message: ERROR_MESSAGES.CONNECTION_ERROR,
+                details: error.message
             };
         }
     }
