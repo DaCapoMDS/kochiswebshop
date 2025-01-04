@@ -1,5 +1,4 @@
-import { writeFile, readFile } from 'fs/promises';
-import { join } from 'path';
+import { Octokit } from '@octokit/rest';
 
 // Order validation schema
 const orderSchema = {
@@ -9,6 +8,15 @@ const orderSchema = {
     items: { type: 'array', minItems: 1 }
   }
 };
+
+// Initialize GitHub client
+const octokit = new Octokit({
+  auth: process.env.GITHUB_TOKEN
+});
+
+const REPO_OWNER = 'DaCapoMDS';
+const REPO_NAME = 'kochiswebshop';
+const BRANCH = 'main';
 
 // Validate order data against schema
 function validateOrder(data) {
@@ -36,24 +44,59 @@ function validateOrder(data) {
   return { valid: true };
 }
 
-// Get next order number from counter file
-async function getNextOrderNumber() {
+// Get current counter value
+async function getCurrentCounter() {
   try {
-    const counterPath = join(process.cwd(), 'orders', 'counter.txt');
-    const counter = parseInt(await readFile(counterPath, 'utf8')) || 0;
-    await writeFile(counterPath, (counter + 1).toString());
-    return counter + 1;
+    const { data } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: 'orders/counter.txt',
+      ref: BRANCH
+    });
+
+    const content = Buffer.from(data.content, 'base64').toString();
+    return parseInt(content.trim()) || 0;
   } catch (error) {
-    console.error('Error managing order counter:', error);
-    // Fallback to timestamp if counter fails
-    return Date.now();
+    console.error('Error reading counter:', error);
+    return 0;
   }
 }
 
-// Save order to filesystem
+// Update counter in repository
+async function updateCounter(currentCounter) {
+  const newCounter = currentCounter + 1;
+  
+  try {
+    // Get current file to get its SHA
+    const { data: currentFile } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: 'orders/counter.txt',
+      ref: BRANCH
+    });
+
+    // Update the file
+    await octokit.repos.createOrUpdateFileContents({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: 'orders/counter.txt',
+      message: `Update order counter to ${newCounter}`,
+      content: Buffer.from(newCounter.toString()).toString('base64'),
+      sha: currentFile.sha,
+      branch: BRANCH
+    });
+
+    return newCounter;
+  } catch (error) {
+    console.error('Error updating counter:', error);
+    throw error;
+  }
+}
+
+// Save order to repository
 async function saveOrder(orderData) {
-  const orderNumber = await getNextOrderNumber();
-  const orderPath = join(process.cwd(), 'orders', `order_${orderNumber}.json`);
+  const currentCounter = await getCurrentCounter();
+  const orderNumber = currentCounter + 1;
   
   const order = {
     id: orderNumber,
@@ -62,16 +105,26 @@ async function saveOrder(orderData) {
     ...orderData
   };
 
-  await writeFile(orderPath, JSON.stringify(order, null, 2));
-  return order;
-}
+  try {
+    // Create order file
+    await octokit.repos.createOrUpdateFileContents({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: `orders/order_${orderNumber}.json`,
+      message: `Create order ${orderNumber}`,
+      content: Buffer.from(JSON.stringify(order, null, 2)).toString('base64'),
+      branch: BRANCH
+    });
 
-// Using Node.js runtime instead of Edge
-export const config = {
-  api: {
-    bodyParser: true
+    // Update counter
+    await updateCounter(currentCounter);
+
+    return order;
+  } catch (error) {
+    console.error('Error saving order:', error);
+    throw error;
   }
-};
+}
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -120,7 +173,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // Save order to filesystem
+    // Save order to repository
     const savedOrder = await saveOrder(req.body);
 
     return res.status(201).json({

@@ -4,6 +4,8 @@
   "description": "Kochi's webshop with Vercel serverless functions",
   "type": "commonjs",
   "dependencies": {
+    "@octokit/rest": "^21.0.2",
+    "@vercel/kv": "^3.0.0",
     "@vercel/node": "^3.0.0"
   },
   "engines": {
