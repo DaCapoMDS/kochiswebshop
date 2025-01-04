@@ -1,5 +1,3 @@
-const { Octokit } = require('@octokit/rest');
-
 // Order validation schema
 const orderSchema = {
   required: ['total', 'items'],
@@ -8,11 +6,6 @@ const orderSchema = {
     items: { type: 'array', minItems: 1 }
   }
 };
-
-// Initialize GitHub client
-const octokit = new Octokit({
-  auth: process.env.GITHUB_TOKEN
-});
 
 const REPO_OWNER = 'DaCapoMDS';
 const REPO_NAME = 'kochiswebshop';
@@ -45,7 +38,7 @@ function validateOrder(data) {
 }
 
 // Get current counter value
-async function getCurrentCounter() {
+async function getCurrentCounter(octokit) {
   try {
     const { data } = await octokit.repos.getContent({
       owner: REPO_OWNER,
@@ -63,7 +56,7 @@ async function getCurrentCounter() {
 }
 
 // Update counter in repository
-async function updateCounter(currentCounter) {
+async function updateCounter(octokit, currentCounter) {
   const newCounter = currentCounter + 1;
   
   try {
@@ -94,8 +87,8 @@ async function updateCounter(currentCounter) {
 }
 
 // Save order to repository
-async function saveOrder(orderData) {
-  const currentCounter = await getCurrentCounter();
+async function saveOrder(octokit, orderData) {
+  const currentCounter = await getCurrentCounter(octokit);
   const orderNumber = currentCounter + 1;
   
   const order = {
@@ -117,7 +110,7 @@ async function saveOrder(orderData) {
     });
 
     // Update counter
-    await updateCounter(currentCounter);
+    await updateCounter(octokit, currentCounter);
 
     return order;
   } catch (error) {
@@ -173,8 +166,14 @@ module.exports = async function handler(req, res) {
       });
     }
 
+    // Dynamically import Octokit
+    const { Octokit } = await import('@octokit/rest');
+    const octokit = new Octokit({
+      auth: process.env.GITHUB_TOKEN
+    });
+
     // Save order to repository
-    const savedOrder = await saveOrder(req.body);
+    const savedOrder = await saveOrder(octokit, req.body);
 
     return res.status(201).json({
       message: 'Order created successfully',
