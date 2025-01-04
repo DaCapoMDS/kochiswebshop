@@ -47,6 +47,37 @@ export class OrderManager {
                 timestamp: data.timestamp
             });
 
+            // If in development, create a test order
+            if (data.environment === 'development') {
+                console.log('Creating test order...');
+                const testOrder = {
+                    items: [
+                        {
+                            id: 'TEST-001',
+                            name: 'Test Product',
+                            price: 9.99,
+                            quantity: 1
+                        }
+                    ],
+                    total: 9.99,
+                    testOrder: true
+                };
+
+                try {
+                    const orderResult = await this.createOrder(testOrder);
+                    console.log('Test order created successfully:', orderResult);
+                } catch (error) {
+                    console.error('Failed to create test order:', error);
+                    return {
+                        success: false,
+                        message: 'API is online but test order creation failed',
+                        details: error.message,
+                        environment: data.environment,
+                        timestamp: data.timestamp
+                    };
+                }
+            }
+
             return {
                 success: true,
                 message: data.message,
@@ -64,10 +95,12 @@ export class OrderManager {
     }
 
     async createOrder(orderData, retryCount = 0) {
-        // First check if order system connection is working
-        const connectionCheck = await this.checkOrderSystemConnection();
-        if (!connectionCheck.success) {
-            throw new Error(connectionCheck.message);
+        // Skip connection check for test orders to avoid infinite loop
+        if (!orderData.testOrder) {
+            const connectionCheck = await this.checkOrderSystemConnection();
+            if (!connectionCheck.success) {
+                throw new Error(connectionCheck.message);
+            }
         }
 
         const order = {
