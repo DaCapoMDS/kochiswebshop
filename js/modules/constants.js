@@ -1,5 +1,5 @@
 // API endpoints
-const VERCEL_API_URL = 'https://kochiswebshop-git-main-dacapos-projects.vercel.app';
+const VERCEL_API_URL = 'https://kochiswebshop.vercel.app';
 
 export const API_ENDPOINTS = {
     ORDERS_API: `${VERCEL_API_URL}/api/create-order`

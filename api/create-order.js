@@ -1,6 +1,3 @@
-const fs = require('fs').promises;
-const path = require('path');
-
 module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,24 +15,6 @@ module.exports = async (req, res) => {
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
     res.status(204).end();
-    return;
-  }
-
-  // Add debug endpoint
-  if (req.url?.endsWith('/debug')) {
-    res.json({
-      message: 'Debug endpoint reached',
-      environment: {
-        VERCEL_ENV: process.env.VERCEL_ENV,
-        NODE_ENV: process.env.NODE_ENV,
-        CWD: process.cwd()
-      },
-      request: {
-        method: req.method,
-        headers: req.headers,
-        url: req.url
-      }
-    });
     return;
   }
 
