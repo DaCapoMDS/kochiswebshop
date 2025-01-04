@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation - Kochi Tea & Coffee Shop</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link href="./styles.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <div class="container">
+            <a class="navbar-brand" href="./index.html">Kochi Tea & Coffee</a>
+        </div>
+    </nav>
+
+    <!-- Confirmation Section -->
+    <div class="container my-5 text-center">
+        <div class="confirmation-box p-5 bg-white rounded shadow-sm">
+            <div class="mb-4">
+                <i class="fas fa-check-circle text-success" style="font-size: 4rem;"></i>
+            </div>
+            <h2 class="mb-4">Thank You for Your Order!</h2>
+            <p class="mb-4">Your order has been successfully placed. We'll send you an email confirmation shortly.</p>
+            <div id="orderInfo" class="order-info mb-4">
+                <!-- Order details will be loaded here -->
+            </div>
+            <div class="d-grid gap-3 col-md-6 mx-auto">
+                <a href="./index.html" class="btn btn-primary">Continue Shopping</a>
+                <button class="btn btn-outline-primary" onclick="window.print()">Print Receipt</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Order Script -->
+    <script type="module">
+        import { OrderManager } from './js/modules/orders.js';
+        
+        // Initialize order manager
+        const orderManager = new OrderManager();
+        
+        // Get current order from localStorage
+        const currentOrder = orderManager.getCurrentOrder();
+        
+        if (currentOrder) {
+            const orderInfo = document.getElementById('orderInfo');
+            orderInfo.innerHTML = `
+                <p class="mb-1">Order Number: <strong>#${currentOrder.issueNumber}</strong></p>
+                <p class="mb-1">Order ID: <strong>${currentOrder.id}</strong></p>
+                <p class="mb-1">Order Status: <strong>${currentOrder.status}</strong></p>
+                <p class="mb-1">Total Amount: <strong>€${currentOrder.total.toFixed(2)}</strong></p>
+                <p>Estimated Delivery: <strong>${new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString()}</strong></p>
+            `;
+
+            // Clear current order from localStorage
+            orderManager.clearCurrentOrder();
+        } else {
+            window.location.href = './index.html';
+        }
+    </script>
+</body>
+</html>

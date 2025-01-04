@@ -1,0 +1,30 @@
+{
+  "id": "ord_test123",
+  "shipping": {
+    "firstName": "Test",
+    "lastName": "User",
+    "email": "test@example.com",
+    "phone": "1234567890",
+    "address": "Test Street 123",
+    "country": "DE",
+    "state": "Test State",
+    "zip": "12345"
+  },
+  "order": {
+    "items": [
+      {
+        "id": 1,
+        "name": "Test Product",
+        "price": 9.99,
+        "quantity": 1
+      }
+    ],
+    "subtotal": 9.99,
+    "shipping": 5,
+    "tax": 1,
+    "total": 15.99
+  },
+  "status": "pending",
+  "createdAt": "2024-01-03T18:00:00.000Z",
+  "orderNumber": 3
+}

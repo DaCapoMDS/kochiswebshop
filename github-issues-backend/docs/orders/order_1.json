@@ -1,0 +1,57 @@
+{
+  "id": "ord_8per5jg12",
+  "shipping": {
+    "firstName": "123123123",
+    "lastName": "123123",
+    "email": "1231231233@123.asd",
+    "phone": "asdaddwwdawad",
+    "address": "asdasd",
+    "country": "IN",
+    "state": "123123",
+    "zip": "8530"
+  },
+  "payment": {
+    "cardName": "122121121212",
+    "cardNumber": "1231213213213231",
+    "expiry": "12/12",
+    "cvv": "1231"
+  },
+  "order": {
+    "items": [
+      {
+        "id": 3,
+        "name": "Earl Grey",
+        "description": "Classic black tea with a hint of bergamot citrus",
+        "price": 6.99,
+        "image_url": "earl_grey.jpg",
+        "category": "Tea",
+        "quantity": 1
+      },
+      {
+        "id": 1,
+        "name": "Masala Chai",
+        "description": "Traditional Indian spiced tea blend with cardamom, cinnamon, and ginger",
+        "price": 8.99,
+        "image_url": "masala_chai.jpg",
+        "category": "Tea",
+        "quantity": 1
+      },
+      {
+        "id": 2,
+        "name": "Jasmine Green Tea",
+        "description": "Fragrant green tea infused with delicate jasmine blossoms",
+        "price": 7.49,
+        "image_url": "jasmine_green_tea.jpg",
+        "category": "Tea",
+        "quantity": 1
+      }
+    ],
+    "subtotal": 23.47,
+    "shipping": 5,
+    "tax": 2.347,
+    "total": 30.817
+  },
+  "status": "pending",
+  "createdAt": "2024-12-27T20:53:15.245Z",
+  "orderNumber": 1
+}
