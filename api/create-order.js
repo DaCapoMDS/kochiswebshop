@@ -60,30 +60,44 @@ async function checkBranchExists(octokit) {
 async function ensureOrdersBranch(octokit) {
   const branchExists = await checkBranchExists(octokit);
   if (!branchExists) {
-    // Get main branch reference
-    const { data: mainRef } = await octokit.git.getRef({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      ref: 'heads/main'
-    });
+    try {
+      // Create an empty tree
+      const { data: tree } = await octokit.git.createTree({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        tree: []
+      });
 
-    // Create orders branch from main
-    await octokit.git.createRef({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      ref: `refs/heads/${ORDERS_BRANCH}`,
-      sha: mainRef.object.sha
-    });
+      // Create a commit with the empty tree
+      const { data: commit } = await octokit.git.createCommit({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        message: 'Initialize orders branch',
+        tree: tree.sha,
+        parents: []
+      });
 
-    // Initialize counter file
-    await octokit.repos.createOrUpdateFileContents({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      path: 'orders/counter.txt',
-      message: 'Initialize order counter',
-      content: Buffer.from('0').toString('base64'),
-      branch: ORDERS_BRANCH
-    });
+      // Create the orders branch pointing to the empty commit
+      await octokit.git.createRef({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        ref: `refs/heads/${ORDERS_BRANCH}`,
+        sha: commit.sha
+      });
+
+      // Initialize counter file
+      await octokit.repos.createOrUpdateFileContents({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path: 'orders/counter.txt',
+        message: 'Initialize order counter',
+        content: Buffer.from('0').toString('base64'),
+        branch: ORDERS_BRANCH
+      });
+    } catch (error) {
+      console.error('Error creating orders branch:', error);
+      throw error;
+    }
   }
 }
 
@@ -160,7 +174,15 @@ async function saveOrder(octokit, orderData) {
       path: `orders/order_${orderNumber}.json`,
       message: `Create order ${orderNumber}`,
       content: Buffer.from(JSON.stringify(order, null, 2)).toString('base64'),
-      branch: ORDERS_BRANCH
+      branch: ORDERS_BRANCH,
+      committer: {
+        name: 'Order System',
+        email: 'orders@kochiswebshop.vercel.app'
+      },
+      author: {
+        name: 'Order System',
+        email: 'orders@kochiswebshop.vercel.app'
+      }
     });
 
     // Update counter
