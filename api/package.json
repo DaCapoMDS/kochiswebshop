@@ -2,7 +2,10 @@
   "name": "kochiswebshop-api",
   "version": "1.0.0",
   "private": true,
-  "dependencies": {},
+  "type": "commonjs",
+  "dependencies": {
+    "@vercel/node": "^3.0.0"
+  },
   "engines": {
     "node": ">=18.x"
   }
