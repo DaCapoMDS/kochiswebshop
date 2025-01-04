@@ -9,7 +9,7 @@ const orderSchema = {
 
 const REPO_OWNER = 'DaCapoMDS';
 const REPO_NAME = 'kochiswebshop';
-const BRANCH = 'main';
+const ORDERS_BRANCH = 'orders'; // Separate branch for orders
 
 // Validate order data against schema
 function validateOrder(data) {
@@ -44,14 +44,58 @@ async function getCurrentCounter(octokit) {
       owner: REPO_OWNER,
       repo: REPO_NAME,
       path: 'orders/counter.txt',
-      ref: BRANCH
+      ref: ORDERS_BRANCH
     });
 
     const content = Buffer.from(data.content, 'base64').toString();
     return parseInt(content.trim()) || 0;
   } catch (error) {
+    if (error.status === 404) {
+      // If branch doesn't exist, create it with initial counter
+      await createOrdersBranch(octokit);
+      return 0;
+    }
     console.error('Error reading counter:', error);
     return 0;
+  }
+}
+
+// Create orders branch if it doesn't exist
+async function createOrdersBranch(octokit) {
+  try {
+    // Get main branch reference
+    const { data: mainRef } = await octokit.git.getRef({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      ref: 'heads/main'
+    });
+
+    // Create orders branch from main
+    try {
+      await octokit.git.createRef({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        ref: `refs/heads/${ORDERS_BRANCH}`,
+        sha: mainRef.object.sha
+      });
+    } catch (error) {
+      if (error.status !== 422) { // 422 means branch already exists
+        throw error;
+      }
+    }
+
+    // Initialize counter file
+    await octokit.repos.createOrUpdateFileContents({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: 'orders/counter.txt',
+      message: 'Initialize order counter',
+      content: Buffer.from('0').toString('base64'),
+      branch: ORDERS_BRANCH
+    });
+  } catch (error) {
+    console.error('Error creating orders branch:', error);
+    throw error;
   }
 }
 
@@ -65,7 +109,7 @@ async function updateCounter(octokit, currentCounter) {
       owner: REPO_OWNER,
       repo: REPO_NAME,
       path: 'orders/counter.txt',
-      ref: BRANCH
+      ref: ORDERS_BRANCH
     });
 
     // Update the file
@@ -76,7 +120,7 @@ async function updateCounter(octokit, currentCounter) {
       message: `Update order counter to ${newCounter}`,
       content: Buffer.from(newCounter.toString()).toString('base64'),
       sha: currentFile.sha,
-      branch: BRANCH
+      branch: ORDERS_BRANCH
     });
 
     return newCounter;
@@ -106,7 +150,7 @@ async function saveOrder(octokit, orderData) {
       path: `orders/order_${orderNumber}.json`,
       message: `Create order ${orderNumber}`,
       content: Buffer.from(JSON.stringify(order, null, 2)).toString('base64'),
-      branch: BRANCH
+      branch: ORDERS_BRANCH
     });
 
     // Update counter
