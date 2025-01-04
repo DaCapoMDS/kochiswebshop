@@ -22,16 +22,16 @@ console.log('Order manager initialized');
 // Make products globally available for other scripts
 window.products = products;
 
-// Add test function for GitHub connection
-window.testGitHubConnection = async function() {
+// Add test function for order system connection
+window.testOrderConnection = async function() {
     const testBtn = document.querySelector('#test-connection-btn');
     const originalText = testBtn.innerHTML;
     testBtn.disabled = true;
     testBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Testing...';
 
     try {
-        const result = await window.orderManager.checkGitHubConnection();
-        console.log('GitHub connection test result:', result);
+        const result = await window.orderManager.checkOrderSystemConnection();
+        console.log('Order system connection test result:', result);
         
         if (result.success) {
             testBtn.className = 'nav-link btn btn-link text-success';
@@ -52,7 +52,7 @@ window.testGitHubConnection = async function() {
             }, 3000);
         }
     } catch (error) {
-        console.error('GitHub connection test failed:', error);
+        console.error('Order system connection test failed:', error);
         testBtn.className = 'nav-link btn btn-link text-danger';
         testBtn.innerHTML = '<i class="fas fa-times"></i> System Error';
         alert('Connection test failed: ' + error.message);
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
         button.id = 'test-connection-btn';
         button.className = 'nav-link btn btn-link';
         button.innerHTML = '<i class="fas fa-sync"></i> Test Connection';
-        button.onclick = window.testGitHubConnection;
+        button.onclick = window.testOrderConnection;
         li.appendChild(button);
         nav.appendChild(li);
     }
@@ -132,8 +132,8 @@ window.checkout = async function() {
     checkoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
 
     try {
-        // Check GitHub connection before proceeding
-        const connectionStatus = await window.orderManager.checkGitHubConnection();
+        // Check order system connection before proceeding
+        const connectionStatus = await window.orderManager.checkOrderSystemConnection();
         
         if (!connectionStatus.success) {
             throw new Error(connectionStatus.message);
