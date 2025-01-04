@@ -12,9 +12,10 @@ const orderSchema = {
   }
 };
 
+// Private repository for orders
 const REPO_OWNER = 'DaCapoMDS';
-const REPO_NAME = 'kochiswebshop';
-const ORDERS_BRANCH = 'orders'; // Separate branch for orders
+const REPO_NAME = 'kochis-orders'; // Private repo for orders
+const ORDERS_BRANCH = 'main';
 
 // Validate order data against schema
 function validateOrder(data) {
@@ -39,13 +40,12 @@ function validateOrder(data) {
   return { valid: true };
 }
 
-// Check if branch exists
-async function checkBranchExists(octokit) {
+// Check if repository exists and is accessible
+async function checkRepository(octokit) {
   try {
-    await octokit.git.getRef({
+    await octokit.repos.get({
       owner: REPO_OWNER,
-      repo: REPO_NAME,
-      ref: `heads/${ORDERS_BRANCH}`
+      repo: REPO_NAME
     });
     return true;
   } catch (error) {
@@ -56,46 +56,29 @@ async function checkBranchExists(octokit) {
   }
 }
 
-// Create orders branch if it doesn't exist
-async function ensureOrdersBranch(octokit) {
-  const branchExists = await checkBranchExists(octokit);
-  if (!branchExists) {
+// Create repository if it doesn't exist
+async function ensureRepository(octokit) {
+  const exists = await checkRepository(octokit);
+  if (!exists) {
     try {
-      // Create an empty tree
-      const { data: tree } = await octokit.git.createTree({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        tree: []
-      });
-
-      // Create a commit with the empty tree
-      const { data: commit } = await octokit.git.createCommit({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        message: 'Initialize orders branch',
-        tree: tree.sha,
-        parents: []
-      });
-
-      // Create the orders branch pointing to the empty commit
-      await octokit.git.createRef({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        ref: `refs/heads/${ORDERS_BRANCH}`,
-        sha: commit.sha
+      await octokit.repos.createForAuthenticatedUser({
+        name: REPO_NAME,
+        private: true,
+        description: 'Private repository for Kochi\'s Webshop orders',
+        auto_init: true
       });
 
       // Initialize counter file
       await octokit.repos.createOrUpdateFileContents({
         owner: REPO_OWNER,
         repo: REPO_NAME,
-        path: 'orders/counter.txt',
+        path: 'counter.txt',
         message: 'Initialize order counter',
         content: Buffer.from('0').toString('base64'),
         branch: ORDERS_BRANCH
       });
     } catch (error) {
-      console.error('Error creating orders branch:', error);
+      console.error('Error creating repository:', error);
       throw error;
     }
   }
@@ -104,12 +87,12 @@ async function ensureOrdersBranch(octokit) {
 // Get current counter value
 async function getCurrentCounter(octokit) {
   try {
-    await ensureOrdersBranch(octokit);
+    await ensureRepository(octokit);
 
     const { data } = await octokit.repos.getContent({
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      path: 'orders/counter.txt',
+      path: 'counter.txt',
       ref: ORDERS_BRANCH
     });
 
@@ -130,7 +113,7 @@ async function updateCounter(octokit, currentCounter) {
     const { data: currentFile } = await octokit.repos.getContent({
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      path: 'orders/counter.txt',
+      path: 'counter.txt',
       ref: ORDERS_BRANCH
     });
 
@@ -138,7 +121,7 @@ async function updateCounter(octokit, currentCounter) {
     await octokit.repos.createOrUpdateFileContents({
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      path: 'orders/counter.txt',
+      path: 'counter.txt',
       message: `Update order counter to ${newCounter}`,
       content: Buffer.from(newCounter.toString()).toString('base64'),
       sha: currentFile.sha,
@@ -154,7 +137,7 @@ async function updateCounter(octokit, currentCounter) {
 
 // Save order to repository
 async function saveOrder(octokit, orderData) {
-  await ensureOrdersBranch(octokit);
+  await ensureRepository(octokit);
   
   const currentCounter = await getCurrentCounter(octokit);
   const orderNumber = currentCounter + 1;
@@ -167,11 +150,39 @@ async function saveOrder(octokit, orderData) {
   };
 
   try {
-    // Create order file
+    // Create order file in a year/month structure for better organization
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const orderPath = `orders/${year}/${month}/order_${orderNumber}.json`;
+
+    // Create year/month directory structure if needed
+    try {
+      await octokit.repos.getContent({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path: `orders/${year}/${month}`,
+        ref: ORDERS_BRANCH
+      });
+    } catch (error) {
+      if (error.status === 404) {
+        // Create directory structure by creating a .gitkeep file
+        await octokit.repos.createOrUpdateFileContents({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          path: `orders/${year}/${month}/.gitkeep`,
+          message: `Create directory structure for ${year}/${month}`,
+          content: Buffer.from('').toString('base64'),
+          branch: ORDERS_BRANCH
+        });
+      }
+    }
+
+    // Save order file
     await octokit.repos.createOrUpdateFileContents({
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      path: `orders/order_${orderNumber}.json`,
+      path: orderPath,
       message: `Create order ${orderNumber}`,
       content: Buffer.from(JSON.stringify(order, null, 2)).toString('base64'),
       branch: ORDERS_BRANCH,
@@ -242,10 +253,10 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // Dynamically import Octokit
+    // Use ORDERS_TOKEN environment variable for private repo access
     const { Octokit } = await import('@octokit/rest');
     const octokit = new Octokit({
-      auth: process.env.GITHUB_TOKEN
+      auth: process.env.ORDERS_TOKEN // Use separate token for orders repo
     });
 
     // Save order to repository
