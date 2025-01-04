@@ -39,32 +39,27 @@ function validateOrder(data) {
   return { valid: true };
 }
 
-// Get current counter value
-async function getCurrentCounter(octokit) {
+// Check if branch exists
+async function checkBranchExists(octokit) {
   try {
-    const { data } = await octokit.repos.getContent({
+    await octokit.git.getRef({
       owner: REPO_OWNER,
       repo: REPO_NAME,
-      path: 'orders/counter.txt',
-      ref: ORDERS_BRANCH
+      ref: `heads/${ORDERS_BRANCH}`
     });
-
-    const content = Buffer.from(data.content, 'base64').toString();
-    return parseInt(content.trim()) || 0;
+    return true;
   } catch (error) {
     if (error.status === 404) {
-      // If branch doesn't exist, create it with initial counter
-      await createOrdersBranch(octokit);
-      return 0;
+      return false;
     }
-    console.error('Error reading counter:', error);
-    return 0;
+    throw error;
   }
 }
 
 // Create orders branch if it doesn't exist
-async function createOrdersBranch(octokit) {
-  try {
+async function ensureOrdersBranch(octokit) {
+  const branchExists = await checkBranchExists(octokit);
+  if (!branchExists) {
     // Get main branch reference
     const { data: mainRef } = await octokit.git.getRef({
       owner: REPO_OWNER,
@@ -73,18 +68,12 @@ async function createOrdersBranch(octokit) {
     });
 
     // Create orders branch from main
-    try {
-      await octokit.git.createRef({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        ref: `refs/heads/${ORDERS_BRANCH}`,
-        sha: mainRef.object.sha
-      });
-    } catch (error) {
-      if (error.status !== 422) { // 422 means branch already exists
-        throw error;
-      }
-    }
+    await octokit.git.createRef({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      ref: `refs/heads/${ORDERS_BRANCH}`,
+      sha: mainRef.object.sha
+    });
 
     // Initialize counter file
     await octokit.repos.createOrUpdateFileContents({
@@ -95,9 +84,26 @@ async function createOrdersBranch(octokit) {
       content: Buffer.from('0').toString('base64'),
       branch: ORDERS_BRANCH
     });
+  }
+}
+
+// Get current counter value
+async function getCurrentCounter(octokit) {
+  try {
+    await ensureOrdersBranch(octokit);
+
+    const { data } = await octokit.repos.getContent({
+      owner: REPO_OWNER,
+      repo: REPO_NAME,
+      path: 'orders/counter.txt',
+      ref: ORDERS_BRANCH
+    });
+
+    const content = Buffer.from(data.content, 'base64').toString();
+    return parseInt(content.trim()) || 0;
   } catch (error) {
-    console.error('Error creating orders branch:', error);
-    throw error;
+    console.error('Error reading counter:', error);
+    return 0;
   }
 }
 
@@ -134,6 +140,8 @@ async function updateCounter(octokit, currentCounter) {
 
 // Save order to repository
 async function saveOrder(octokit, orderData) {
+  await ensureOrdersBranch(octokit);
+  
   const currentCounter = await getCurrentCounter(octokit);
   const orderNumber = currentCounter + 1;
   
