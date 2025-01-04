@@ -1,0 +1,9 @@
+.vercel
+.env*.local
+
+# Dependencies
+node_modules/
+
+# Order storage (now using private repository)
+orders.json
+orders/
