@@ -13,52 +13,64 @@ module.exports = async (req, res) => {
   console.log('Request URL:', req.url);
   console.log('Vercel Environment:', process.env.VERCEL_ENV || 'development');
   console.log('Node Environment:', process.env.NODE_ENV);
+  console.log('Current Working Directory:', process.cwd());
 
   // Handle preflight requests
   if (req.method === 'OPTIONS') {
-    res.status(204).end();
+    res.setHeader('Content-Length', '0');
+    res.writeHead(204);
+    res.end();
     return;
   }
 
   // Add debug endpoint
-  if (req.url.endsWith('/debug')) {
-    return res.status(200).json({
+  if (req.url?.endsWith('/debug')) {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       message: 'Debug endpoint reached',
       environment: {
         VERCEL_ENV: process.env.VERCEL_ENV,
-        NODE_ENV: process.env.NODE_ENV
+        NODE_ENV: process.env.NODE_ENV,
+        CWD: process.cwd()
       },
       request: {
         method: req.method,
         headers: req.headers,
         url: req.url
       }
-    });
+    }));
+    return;
   }
 
   // Allow GET requests for connection testing
   if (req.method === 'GET') {
-    return res.status(200).json({
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       status: 'success',
       message: 'Order system is ready',
-      environment: process.env.VERCEL_ENV || 'development'
-    });
+      environment: process.env.VERCEL_ENV || 'development',
+      timestamp: new Date().toISOString()
+    }));
+    return;
   }
 
   // Only allow POST requests for actual orders
   if (req.method !== 'POST') {
-    return res.status(405).json({
+    res.writeHead(405, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       error: 'Method not allowed',
       details: 'Only GET and POST requests are supported'
-    });
+    }));
+    return;
   }
 
-  const orderData = req.body;
-  if (!orderData) {
-    return res.status(400).json({
+  if (!req.body) {
+    res.writeHead(400, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       error: 'Bad request',
       details: 'Order data is required'
-    });
+    }));
+    return;
   }
 
   try {
@@ -89,25 +101,27 @@ module.exports = async (req, res) => {
       id: counter,
       timestamp: new Date().toISOString(),
       status: 'pending',
-      ...orderData
+      ...req.body
     };
 
     await fs.writeFile(orderPath, JSON.stringify(orderContent, null, 2));
 
-    return res.status(201).json({
+    res.writeHead(201, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       message: 'Order created successfully',
       order: {
         id: counter,
         timestamp: orderContent.timestamp,
         status: orderContent.status
       }
-    });
+    }));
 
   } catch (error) {
     console.error('Error processing order:', error);
-    return res.status(500).json({
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       error: 'Internal server error',
       details: error.message
-    });
+    }));
   }
 };
