@@ -10,6 +10,37 @@ export class OrderManager {
         this.RETRY_DELAY = 2000; // 2 seconds
     }
 
+    async createTestOrder(apiData) {
+        console.log('Creating test order...');
+        const testOrder = {
+            items: [
+                {
+                    id: 'TEST-001',
+                    name: 'Test Product',
+                    price: 9.99,
+                    quantity: 1
+                }
+            ],
+            total: 9.99,
+            testOrder: true
+        };
+
+        try {
+            const orderResult = await this.createOrder(testOrder);
+            console.log('Test order created successfully:', orderResult);
+            return { success: true, order: orderResult };
+        } catch (error) {
+            console.error('Failed to create test order:', error);
+            return {
+                success: false,
+                message: 'API is online but test order creation failed',
+                details: error.message,
+                environment: apiData.environment,
+                timestamp: apiData.timestamp
+            };
+        }
+    }
+
     async checkOrderSystemConnection() {
         try {
             console.log('Checking Vercel API connection...');
@@ -49,32 +80,9 @@ export class OrderManager {
 
             // If in development, create a test order
             if (data.environment === 'development') {
-                console.log('Creating test order...');
-                const testOrder = {
-                    items: [
-                        {
-                            id: 'TEST-001',
-                            name: 'Test Product',
-                            price: 9.99,
-                            quantity: 1
-                        }
-                    ],
-                    total: 9.99,
-                    testOrder: true
-                };
-
-                try {
-                    const orderResult = await this.createOrder(testOrder);
-                    console.log('Test order created successfully:', orderResult);
-                } catch (error) {
-                    console.error('Failed to create test order:', error);
-                    return {
-                        success: false,
-                        message: 'API is online but test order creation failed',
-                        details: error.message,
-                        environment: data.environment,
-                        timestamp: data.timestamp
-                    };
+                const testResult = await this.createTestOrder(data);
+                if (!testResult.success) {
+                    return testResult;
                 }
             }
 
@@ -133,17 +141,11 @@ export class OrderManager {
                 const errorData = await response.json();
                 console.error('Full error response:', errorData);
                 
-                let errorMessage;
-                switch (response.status) {
-                    case 404:
-                        errorMessage = ERROR_MESSAGES.SYSTEM_UNAVAILABLE;
-                        break;
-                    case 422:
-                        errorMessage = ERROR_MESSAGES.INVALID_ORDER;
-                        break;
-                    default:
-                        errorMessage = ERROR_MESSAGES.SYSTEM_ERROR;
-                }
+                const errorMap = {
+                    404: ERROR_MESSAGES.SYSTEM_UNAVAILABLE,
+                    422: ERROR_MESSAGES.INVALID_ORDER
+                };
+                const errorMessage = errorMap[response.status] || ERROR_MESSAGES.SYSTEM_ERROR;
                 
                 console.error('Order creation failed:', {
                     status: response.status,

@@ -22,133 +22,111 @@ function validateOrder(data) {
     return { valid: false, error: 'Order data must be an object' };
   }
 
-  // Check for order object
-  if (!data.order || typeof data.order !== 'object') {
-    return { valid: false, error: 'Missing order details' };
+  const { order } = data;
+  const errors = [];
+
+  // Check against schema
+  if (!order) {
+    errors.push('Missing order details');
+  } else {
+    if (!Array.isArray(order.items) || order.items.length === 0) {
+      errors.push('Order must contain at least one item');
+    }
+    if (typeof order.total !== 'number' || order.total < 0) {
+      errors.push('Invalid total amount');
+    }
   }
 
-  // Check required fields in order
-  if (!Array.isArray(data.order.items) || data.order.items.length === 0) {
-    return { valid: false, error: 'Order must contain at least one item' };
-  }
-
-  if (typeof data.order.total !== 'number' || data.order.total < 0) {
-    return { valid: false, error: 'Invalid total amount' };
-  }
-
-  return { valid: true };
+  return errors.length > 0
+    ? { valid: false, error: errors.join(', ') }
+    : { valid: true };
 }
 
-// Get current counter value
-async function getCurrentCounter(octokit) {
+// Manage order counter in repository
+async function manageOrderCounter(octokit) {
+  const path = 'counter.txt';
+  const committer = {
+    name: 'Order System',
+    email: 'orders@kochiswebshop.vercel.app'
+  };
+
   try {
-    const { data } = await octokit.repos.getContent({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      path: 'counter.txt',
-      ref: ORDERS_BRANCH
-    });
+    // Get current counter
+    let currentCounter = 0;
+    try {
+      const { data } = await octokit.repos.getContent({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path,
+        ref: ORDERS_BRANCH
+      });
+      currentCounter = parseInt(Buffer.from(data.content, 'base64').toString().trim()) || 0;
 
-    const content = Buffer.from(data.content, 'base64').toString();
-    return parseInt(content.trim()) || 0;
-  } catch (error) {
-    console.error('Error reading counter:', error);
-    return 0;
-  }
-}
+      // Update counter
+      const newCounter = currentCounter + 1;
+      await octokit.repos.createOrUpdateFileContents({
+        owner: REPO_OWNER,
+        repo: REPO_NAME,
+        path,
+        message: `Update order counter to ${newCounter}`,
+        content: Buffer.from(newCounter.toString()).toString('base64'),
+        sha: data.sha,
+        branch: ORDERS_BRANCH,
+        committer,
+        author: committer
+      });
 
-// Update counter in repository
-async function updateCounter(octokit, currentCounter) {
-  const newCounter = currentCounter + 1;
-  
-  try {
-    // Get current file to get its SHA
-    const { data: currentFile } = await octokit.repos.getContent({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      path: 'counter.txt',
-      ref: ORDERS_BRANCH
-    });
-
-    // Update the file
-    await octokit.repos.createOrUpdateFileContents({
-      owner: REPO_OWNER,
-      repo: REPO_NAME,
-      path: 'counter.txt',
-      message: `Update order counter to ${newCounter}`,
-      content: Buffer.from(newCounter.toString()).toString('base64'),
-      sha: currentFile.sha,
-      branch: ORDERS_BRANCH,
-      committer: {
-        name: 'Order System',
-        email: 'orders@kochiswebshop.vercel.app'
-      },
-      author: {
-        name: 'Order System',
-        email: 'orders@kochiswebshop.vercel.app'
+      return newCounter;
+    } catch (error) {
+      if (error.status === 404) {
+        // Counter file doesn't exist, create it with initial value 1
+        await octokit.repos.createOrUpdateFileContents({
+          owner: REPO_OWNER,
+          repo: REPO_NAME,
+          path,
+          message: 'Initialize order counter',
+          content: Buffer.from('1').toString('base64'),
+          branch: ORDERS_BRANCH,
+          committer,
+          author: committer
+        });
+        return 1;
       }
-    });
-
-    return newCounter;
+      throw error;
+    }
   } catch (error) {
-    console.error('Error updating counter:', error);
+    console.error('Error managing counter:', error);
     throw error;
   }
 }
 
 // Save order to repository
 async function saveOrder(octokit, orderData) {
-  const currentCounter = await getCurrentCounter(octokit);
-  const orderNumber = currentCounter + 1;
-  
-  const order = {
-    id: orderNumber,
-    timestamp: new Date().toISOString(),
-    status: 'pending',
-    ...orderData
-  };
-
   try {
-    // Create order file
-    const createOptions = {
+    const orderNumber = await manageOrderCounter(octokit);
+    
+    const order = {
+      id: orderNumber,
+      timestamp: new Date().toISOString(),
+      status: 'pending',
+      ...orderData
+    };
+
+    const committer = {
+      name: 'Order System',
+      email: 'orders@kochiswebshop.vercel.app'
+    };
+
+    await octokit.repos.createOrUpdateFileContents({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       path: `orders/order_${orderNumber}.json`,
       message: `Create order ${orderNumber}`,
       content: Buffer.from(JSON.stringify(order, null, 2)).toString('base64'),
       branch: ORDERS_BRANCH,
-      committer: {
-        name: 'Order System',
-        email: 'orders@kochiswebshop.vercel.app'
-      },
-      author: {
-        name: 'Order System',
-        email: 'orders@kochiswebshop.vercel.app'
-      }
-    };
-
-    // Try to get existing file (will fail if it doesn't exist)
-    try {
-      const { data: existingFile } = await octokit.repos.getContent({
-        owner: REPO_OWNER,
-        repo: REPO_NAME,
-        path: createOptions.path,
-        ref: ORDERS_BRANCH
-      });
-      // If file exists, add its SHA
-      createOptions.sha = existingFile.sha;
-    } catch (error) {
-      // File doesn't exist, which is fine for new orders
-      if (error.status !== 404) {
-        throw error;
-      }
-    }
-
-    // Create/update the file
-    await octokit.repos.createOrUpdateFileContents(createOptions);
-
-    // Update counter
-    await updateCounter(octokit, currentCounter);
+      committer,
+      author: committer
+    });
 
     return order;
   } catch (error) {
