@@ -1,8 +1,7 @@
 export class Cart {
     constructor() {
         this.items = JSON.parse(localStorage.getItem('cart')) || [];
-        this.updateCartCount();
-        this.updateCartUI();
+        this.refresh();
     }
 
     addItem(product) {
@@ -15,63 +14,37 @@ export class Cart {
                 quantity: 1
             });
         }
-        this.saveCart();
-        this.updateCartCount();
-        this.updateCartUI();
-        this.showToast(`${product.name} added to cart`);
-    }
-
-    showToast(message) {
-        // Create toast container if it doesn't exist
-        let toastContainer = document.getElementById('toast-container');
-        if (!toastContainer) {
-            toastContainer = document.createElement('div');
-            toastContainer.id = 'toast-container';
-            document.body.appendChild(toastContainer);
-        }
-
-        // Create toast element
-        const toast = document.createElement('div');
-        toast.className = 'toast show';
-        toast.innerHTML = `
-            <div class="toast-body">
-                <i class="fas fa-check-circle text-success me-2"></i>
-                ${message}
-            </div>
-        `;
-
-        // Add to container
-        toastContainer.appendChild(toast);
-
-        // Remove after animation
-        setTimeout(() => {
-            toast.classList.add('hiding');
-            setTimeout(() => toast.remove(), 500);
-        }, 2000);
+        this.refresh();
     }
 
     removeItem(productId) {
         this.items = this.items.filter(item => item.id !== productId);
-        this.saveCart();
-        this.updateCartCount();
-        this.updateCartUI();
+        this.refresh();
     }
 
     updateQuantity(productId, quantity) {
+        const newQuantity = parseInt(quantity);
+        if (isNaN(newQuantity) || newQuantity < 0) return;
+
         const item = this.items.find(item => item.id === productId);
-        if (item) {
-            item.quantity = parseInt(quantity);
-            if (item.quantity <= 0) {
-                this.removeItem(productId);
-            } else {
-                this.saveCart();
-                this.updateCartUI();
-            }
+        if (!item) return;
+
+        if (newQuantity === 0) {
+            this.removeItem(productId);
+        } else {
+            item.quantity = newQuantity;
+            this.refresh();
         }
     }
 
     getTotal() {
         return this.items.reduce((total, item) => total + (item.price * item.quantity), 0);
+    }
+
+    refresh() {
+        this.saveCart();
+        this.updateCartCount();
+        this.updateCartUI();
     }
 
     saveCart() {

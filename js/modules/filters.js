@@ -1,15 +1,15 @@
 // Filter and sort settings
-let currentFilters = {
+const currentFilters = {
     category: 'all',
     priceRange: 'all',
-    location: 'all',
     sort: 'relevance'
 };
 
 function applyPriceFilter(product, priceRange) {
+    if (priceRange === 'all') return true;
+    
     const price = product.price;
     switch(priceRange) {
-        case 'all': return true;
         case '0-20': return price <= 20;
         case '20-50': return price > 20 && price <= 50;
         case '50-100': return price > 50 && price <= 100;
@@ -39,26 +39,21 @@ function sortProducts(products, sortOrder) {
 }
 
 function initializeFilters(onFilterChange) {
-    // Event listeners for filters
+    // Price range filters
     document.querySelectorAll('input[name="priceRange"]').forEach(input => {
         input.addEventListener('change', function() {
             currentFilters.priceRange = this.value;
-            if (this.value === 'custom') {
-                document.getElementById('customPriceRange').style.display = 'block';
-            } else {
-                document.getElementById('customPriceRange').style.display = 'none';
+            const customRange = document.getElementById('customPriceRange');
+            if (customRange) {
+                customRange.style.display = this.value === 'custom' ? 'block' : 'none';
+            }
+            if (this.value !== 'custom') {
                 onFilterChange();
             }
         });
     });
 
-    document.querySelectorAll('input[name="location"]').forEach(input => {
-        input.addEventListener('change', function() {
-            currentFilters.location = this.value;
-            onFilterChange();
-        });
-    });
-
+    // Category filters
     document.querySelectorAll('input[name="category"]').forEach(input => {
         input.addEventListener('change', function() {
             currentFilters.category = this.value;
@@ -66,13 +61,20 @@ function initializeFilters(onFilterChange) {
         });
     });
 
-    document.getElementById('sortOrder').addEventListener('change', function() {
-        currentFilters.sort = this.value;
-        onFilterChange();
-    });
+    // Sort order
+    const sortOrder = document.getElementById('sortOrder');
+    if (sortOrder) {
+        sortOrder.addEventListener('change', function() {
+            currentFilters.sort = this.value;
+            onFilterChange();
+        });
+    }
 
-    // Custom price range handler
-    document.querySelector('#customPriceRange button').addEventListener('click', onFilterChange);
+    // Custom price range
+    const customRangeButton = document.querySelector('#customPriceRange button');
+    if (customRangeButton) {
+        customRangeButton.addEventListener('click', onFilterChange);
+    }
 }
 
 export { currentFilters, applyPriceFilter, sortProducts, initializeFilters };

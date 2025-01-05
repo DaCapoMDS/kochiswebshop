@@ -36,32 +36,23 @@ window.testOrderConnection = async function() {
         if (result.success) {
             testBtn.className = 'nav-link btn btn-link text-success';
             testBtn.innerHTML = '<i class="fas fa-check"></i> System Ready';
-            setTimeout(() => {
-                testBtn.className = 'nav-link btn btn-link';
-                testBtn.innerHTML = originalText;
-                testBtn.disabled = false;
-            }, 3000);
         } else {
             testBtn.className = 'nav-link btn btn-link text-danger';
             testBtn.innerHTML = '<i class="fas fa-times"></i> System Error';
             alert(result.message);
-            setTimeout(() => {
-                testBtn.className = 'nav-link btn btn-link';
-                testBtn.innerHTML = originalText;
-                testBtn.disabled = false;
-            }, 3000);
         }
     } catch (error) {
         console.error('Order system connection test failed:', error);
         testBtn.className = 'nav-link btn btn-link text-danger';
         testBtn.innerHTML = '<i class="fas fa-times"></i> System Error';
         alert('Connection test failed: ' + error.message);
-        setTimeout(() => {
-            testBtn.className = 'nav-link btn btn-link';
-            testBtn.innerHTML = originalText;
-            testBtn.disabled = false;
-        }, 3000);
     }
+
+    setTimeout(() => {
+        testBtn.className = 'nav-link btn btn-link';
+        testBtn.innerHTML = originalText;
+        testBtn.disabled = false;
+    }, 3000);
 };
 
 // Add test button to the page
@@ -125,27 +116,24 @@ window.checkout = async function() {
         return;
     }
 
-    // Show loading state on checkout button
     const checkoutBtn = document.querySelector('.cart-footer .btn-primary');
     const originalText = checkoutBtn.textContent;
     checkoutBtn.disabled = true;
     checkoutBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
 
     try {
-        // Check order system connection before proceeding
         const connectionStatus = await window.orderManager.checkOrderSystemConnection();
+        console.log('Checkout connection status:', connectionStatus);
         
         if (!connectionStatus.success) {
             throw new Error(connectionStatus.message);
         }
 
-        // If we get here, the validation was successful
         window.location.href = './checkout.html';
     } catch (error) {
         console.error('Order system validation failed:', error);
         alert(error.message || 'Sorry, the order system is temporarily unavailable. Please try again later.');
     } finally {
-        // Restore checkout button state
         checkoutBtn.disabled = false;
         checkoutBtn.textContent = originalText;
     }
