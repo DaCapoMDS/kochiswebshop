@@ -1,5 +1,5 @@
 import { currentFilters, applyPriceFilter, sortProducts, initializeFilters } from './modules/filters.js';
-import { displayProducts, ITEMS_PER_PAGE } from './modules/productDisplay.js';
+import { displayProducts } from './modules/productDisplay.js';
 import { updatePagination, scrollToTop } from './modules/pagination.js';
 import { products } from './modules/products.js';
 import { Cart } from './modules/cart.js';
